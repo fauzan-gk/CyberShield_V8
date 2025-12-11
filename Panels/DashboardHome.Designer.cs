@@ -18,19 +18,19 @@
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(DashboardHome));
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges1 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges2 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(DashboardHome));
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges3 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges4 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges5 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges6 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges7 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges8 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges9 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges10 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges11 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges12 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges9 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges10 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges13 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges14 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             timer1 = new System.Windows.Forms.Timer(components);
@@ -107,7 +107,7 @@
             label4.ForeColor = Color.WhiteSmoke;
             label4.Location = new Point(78, 55);
             label4.Name = "label4";
-            label4.Size = new Size(257, 15);
+            label4.Size = new Size(242, 15);
             label4.TabIndex = 6;
             label4.Text = "Real-time shield active. Last check: Just now.";
             // 
@@ -118,7 +118,7 @@
             label3.ForeColor = Color.White;
             label3.Location = new Point(75, 23);
             label3.Name = "label3";
-            label3.Size = new Size(307, 30);
+            label3.Size = new Size(297, 30);
             label3.TabIndex = 5;
             label3.Text = "System Protected  Optimized";
             // 
@@ -193,7 +193,7 @@
             lblCloudStatus.ForeColor = Color.Orange;
             lblCloudStatus.Location = new Point(130, 80);
             lblCloudStatus.Name = "lblCloudStatus";
-            lblCloudStatus.Size = new Size(69, 15);
+            lblCloudStatus.Size = new Size(73, 15);
             lblCloudStatus.TabIndex = 7;
             lblCloudStatus.Text = "Initializing...";
             // 
@@ -226,7 +226,7 @@
             label7.ForeColor = Color.LightGray;
             label7.Location = new Point(15, 58);
             label7.Name = "label7";
-            label7.Size = new Size(103, 15);
+            label7.Size = new Size(102, 15);
             label7.TabIndex = 4;
             label7.Text = "Global Signatures:";
             // 
@@ -237,7 +237,7 @@
             lblDbVersion.ForeColor = Color.FromArgb(16, 185, 129);
             lblDbVersion.Location = new Point(130, 36);
             lblDbVersion.Name = "lblDbVersion";
-            lblDbVersion.Size = new Size(52, 15);
+            lblDbVersion.Size = new Size(54, 15);
             lblDbVersion.TabIndex = 3;
             lblDbVersion.Text = "v.2025.4";
             // 
@@ -259,7 +259,7 @@
             lblLastScan.ForeColor = Color.White;
             lblLastScan.Location = new Point(130, 14);
             lblLastScan.Name = "lblLastScan";
-            lblLastScan.Size = new Size(39, 15);
+            lblLastScan.Size = new Size(42, 15);
             lblLastScan.TabIndex = 1;
             lblLastScan.Text = "Never";
             // 
@@ -284,11 +284,11 @@
             panelCpu.Controls.Add(cpuProgressBar);
             panelCpu.Controls.Add(lblCpuValue);
             panelCpu.Controls.Add(label1);
-            panelCpu.CustomizableEdges = customizableEdges9;
+            panelCpu.CustomizableEdges = customizableEdges11;
             panelCpu.FillColor = Color.FromArgb(50, 30, 41, 59);
             panelCpu.Location = new Point(34, 280);
             panelCpu.Name = "panelCpu";
-            panelCpu.ShadowDecoration.CustomizableEdges = customizableEdges10;
+            panelCpu.ShadowDecoration.CustomizableEdges = customizableEdges12;
             panelCpu.Size = new Size(310, 120);
             panelCpu.TabIndex = 8;
             // 
@@ -306,14 +306,13 @@
             // cpuProgressBar
             // 
             cpuProgressBar.BorderRadius = 5;
-            cpuProgressBar.CustomizableEdges = customizableEdges11;
+            cpuProgressBar.CustomizableEdges = customizableEdges9;
             cpuProgressBar.FillColor = Color.FromArgb(30, 33, 57);
-            cpuProgressBar.GradientMode = System.Drawing.Drawing2D.LinearGradientMode.Horizontal;
             cpuProgressBar.Location = new Point(20, 55);
             cpuProgressBar.Name = "cpuProgressBar";
             cpuProgressBar.ProgressColor = Color.FromArgb(59, 130, 246);
             cpuProgressBar.ProgressColor2 = Color.Violet;
-            cpuProgressBar.ShadowDecoration.CustomizableEdges = customizableEdges12;
+            cpuProgressBar.ShadowDecoration.CustomizableEdges = customizableEdges10;
             cpuProgressBar.Size = new Size(270, 15);
             cpuProgressBar.TabIndex = 2;
             cpuProgressBar.Text = "guna2ProgressBar1";
@@ -326,7 +325,7 @@
             lblCpuValue.ForeColor = Color.White;
             lblCpuValue.Location = new Point(15, 5);
             lblCpuValue.Name = "lblCpuValue";
-            lblCpuValue.Size = new Size(65, 45);
+            lblCpuValue.Size = new Size(66, 45);
             lblCpuValue.TabIndex = 1;
             lblCpuValue.Text = "0%";
             // 
@@ -366,21 +365,20 @@
             lblRamStatus.ForeColor = Color.Silver;
             lblRamStatus.Location = new Point(20, 85);
             lblRamStatus.Name = "lblRamStatus";
-            lblRamStatus.Size = new Size(69, 15);
+            lblRamStatus.Size = new Size(72, 15);
             lblRamStatus.TabIndex = 3;
             lblRamStatus.Text = "4 GB / 16 GB";
             // 
             // ramProgressBar
             // 
             ramProgressBar.BorderRadius = 5;
-            ramProgressBar.CustomizableEdges = customizableEdges11;
+            ramProgressBar.CustomizableEdges = customizableEdges9;
             ramProgressBar.FillColor = Color.FromArgb(30, 33, 57);
-            ramProgressBar.GradientMode = System.Drawing.Drawing2D.LinearGradientMode.Horizontal;
             ramProgressBar.Location = new Point(20, 55);
             ramProgressBar.Name = "ramProgressBar";
             ramProgressBar.ProgressColor = Color.Cyan;
             ramProgressBar.ProgressColor2 = Color.Teal;
-            ramProgressBar.ShadowDecoration.CustomizableEdges = customizableEdges12;
+            ramProgressBar.ShadowDecoration.CustomizableEdges = customizableEdges10;
             ramProgressBar.Size = new Size(270, 15);
             ramProgressBar.TabIndex = 2;
             ramProgressBar.Text = "guna2ProgressBar2";
@@ -393,7 +391,7 @@
             lblRamValue.ForeColor = Color.White;
             lblRamValue.Location = new Point(15, 5);
             lblRamValue.Name = "lblRamValue";
-            lblRamValue.Size = new Size(65, 45);
+            lblRamValue.Size = new Size(66, 45);
             lblRamValue.TabIndex = 1;
             lblRamValue.Text = "0%";
             // 
@@ -404,7 +402,7 @@
             label9.ForeColor = Color.Cyan;
             label9.Location = new Point(255, 15);
             label9.Name = "label9";
-            label9.Size = new Size(42, 19);
+            label9.Size = new Size(41, 19);
             label9.TabIndex = 0;
             label9.Text = "RAM";
             // 

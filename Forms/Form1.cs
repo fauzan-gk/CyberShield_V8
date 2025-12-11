@@ -120,6 +120,18 @@ namespace CyberShield_V3
             // if (guna2GradientPanel1 != null) guna2GradientPanel1.Enabled = isEnabled;
         }
 
+        private void ShowSettings()
+        {
+
+            SetActivePanel(settingsPanel);
+
+            // Update Button States (Visual Feedback)
+            if (homeButton != null) homeButton.Checked = false;
+            if (scanButton != null) scanButton.Checked = false;
+            if (cleanButton != null) cleanButton.Checked = false;
+            if (settingsButton != null) settingsButton.Checked = true;
+        }
+
         private void InitializeRealTimeProtection()
         {
             // 1. Setup Tray Icon for Notifications
@@ -349,6 +361,25 @@ namespace CyberShield_V3
                 settingsPanel = new SettingsPanel();
                 settingsPanel.Dock = DockStyle.Fill;
 
+                // --- ADD THIS MISSING CONNECTION ---
+                settingsPanel.ProtectionToggled += (s, isActive) =>
+                {
+                    // 1. Enable/Disable the Watchers
+                    if (_protectors != null)
+                    {
+                        foreach (var watcher in _protectors)
+                        {
+                            watcher.EnableRaisingEvents = isActive;
+                        }
+                    }
+
+                    // 2. Update the Dashboard UI (Turns Red/Green)
+                    if (dashboardHome != null)
+                    {
+                        dashboardHome.UpdateProtectionStatus(isActive);
+                    }
+                };
+
                 if (mainPanel == null) throw new Exception("mainPanel is null - Designer may have failed");
 
                 mainPanel.Controls.Add(dashboardHome);
@@ -370,7 +401,8 @@ namespace CyberShield_V3
             if (homeButton != null) homeButton.Click += (s, e) => ShowDashboard();
             if (scanButton != null) scanButton.Click += (s, e) => ShowScanHome();
             if (cleanButton != null) cleanButton.Click += (s, e) => ShowJunkCleaner();
-            if (settingsButton != null) settingsButton.Click += (s, e) => SetActivePanel(settingsPanel);
+            if (settingsButton != null) settingsButton.Click += (s, e) => ShowSettings();
+
             if (guna2GradientPanel1 != null)
             {
                 guna2GradientPanel1.MouseDown += MoveForm;
