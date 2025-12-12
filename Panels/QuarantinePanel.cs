@@ -21,6 +21,7 @@ namespace CyberShield_V3.Panels
         private List<ThreatInfo> threats;
 
         public event EventHandler BackClicked;
+        public event EventHandler ThreatsChanged;
 
         public QuarantinePanel()
         {
@@ -165,6 +166,19 @@ namespace CyberShield_V3.Panels
             mainPanel.ResumeLayout(false);
             mainPanel.PerformLayout();
             ResumeLayout(false);
+
+            // threatListView setup
+            threatsListView.View = View.Details;
+            threatsListView.GridLines = true;
+            threatsListView.FullRowSelect = true;
+
+            // --- ADD THESE LINES ---
+            threatsListView.Columns.Add("Threat Name", 150);
+            threatsListView.Columns.Add("Type", 100);
+            threatsListView.Columns.Add("Original Path", 250);
+            threatsListView.Columns.Add("Detection", 100);
+            threatsListView.Columns.Add("Status", 100);
+            // -----------------------
         }
 
         public void LoadThreats(List<ThreatInfo> detectedThreats)
@@ -222,24 +236,39 @@ namespace CyberShield_V3.Panels
 
                     try
                     {
-                        if (threat.IsQuarantined && File.Exists(threat.QuarantinedPath))
+                        // 1. Try to delete the Quarantined Backup
+                        if (!string.IsNullOrEmpty(threat.QuarantinedPath) && File.Exists(threat.QuarantinedPath))
                         {
                             File.Delete(threat.QuarantinedPath);
-                            itemsToRemove.Add(item);
-                            threats.Remove(threat);
                         }
+
+                        // 2. NEW: Try to delete the Original File (if it's still there!)
+                        // This handles cases where Quarantine failed and the file was left behind.
+                        if (!string.IsNullOrEmpty(threat.FilePath) && File.Exists(threat.FilePath))
+                        {
+                            File.Delete(threat.FilePath);
+                        }
+
+                        // Remove from list
+                        itemsToRemove.Add(item);
+                        threats.Remove(threat);
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Failed to delete {threat.ThreatName}: {ex.Message}",
+                        // If file is open in another app, this might fail.
+                        MessageBox.Show($"Failed to delete {threat.ThreatName} from disk.\nIt might be open in another program.\n\nError: {ex.Message}",
                             "Deletion Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
 
+                // Clean up UI
                 foreach (var item in itemsToRemove)
                 {
                     threatsListView.Items.Remove(item);
                 }
+
+                // Save changes
+                ThreatsChanged?.Invoke(this, EventArgs.Empty);
 
                 LoadThreats(threats);
                 MessageBox.Show($"{itemsToRemove.Count} threat(s) permanently deleted.",
@@ -249,12 +278,7 @@ namespace CyberShield_V3.Panels
 
         private void DeleteAllButton_Click(object sender, EventArgs e)
         {
-            if (threats.Count == 0)
-            {
-                MessageBox.Show("No threats to delete.", "No Threats",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
+            if (threats.Count == 0) return;
 
             DialogResult result = MessageBox.Show(
                 $"Are you sure you want to permanently delete ALL {threats.Count} threat(s)? This cannot be undone!",
@@ -271,27 +295,36 @@ namespace CyberShield_V3.Panels
                 {
                     try
                     {
-                        if (threat.IsQuarantined && File.Exists(threat.QuarantinedPath))
+                        // 1. Delete Backup
+                        if (!string.IsNullOrEmpty(threat.QuarantinedPath) && File.Exists(threat.QuarantinedPath))
                         {
                             File.Delete(threat.QuarantinedPath);
-                            deletedCount++;
-                            threatsToRemove.Add(threat);
                         }
+
+                        // 2. Delete Original
+                        if (!string.IsNullOrEmpty(threat.FilePath) && File.Exists(threat.FilePath))
+                        {
+                            File.Delete(threat.FilePath);
+                        }
+
+                        threatsToRemove.Add(threat);
+                        deletedCount++;
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Failed to delete {threat.ThreatName}: {ex.Message}",
-                            "Deletion Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        // Log error or continue trying others
+                        System.Diagnostics.Debug.WriteLine($"Failed to delete {threat.FilePath}: {ex.Message}");
                     }
                 }
 
-                // Remove deleted threats from the list
                 foreach (var threat in threatsToRemove)
                 {
                     threats.Remove(threat);
                 }
 
+                ThreatsChanged?.Invoke(this, EventArgs.Empty);
                 LoadThreats(threats);
+
                 MessageBox.Show($"All {deletedCount} threat(s) permanently deleted.",
                     "Delete All Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }

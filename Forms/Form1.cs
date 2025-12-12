@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Text.Json;
 
 namespace CyberShield_V3
 {
@@ -22,6 +23,9 @@ namespace CyberShield_V3
         private JunkCleanerPanel junkCleanerPanel;
         private ScanHomePanel scanHomePanel;
         private SettingsPanel settingsPanel;
+
+        private string threatsLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CyberShield", "threats_log.json");
+
 
         private volatile bool _stopRequested = false;
 
@@ -51,6 +55,7 @@ namespace CyberShield_V3
                 this.BackColor = Color.FromArgb(34, 67, 92);
 
                 detectedThreats = new List<ThreatInfo>();
+                LoadThreatsFromDisk();
                 VirusDatabase = new VirusDatabaseEnhanced();
                 _cloudScanner = new MalwareBazaarClient(API_KEY);
                 _scanHistory = new ScanHistory();
@@ -142,9 +147,7 @@ namespace CyberShield_V3
 
             _trayIcon.MouseDoubleClick += (s, e) =>
             {
-                this.Show();
-                this.WindowState = FormWindowState.Normal;
-                _trayIcon.Visible = false; // Uncomment if you want icon to hide when window is open
+                RestoreWindow();
             };
 
             // 2. Define folders to watch
@@ -184,6 +187,21 @@ namespace CyberShield_V3
             // Update Dashboard to show Active
             if (dashboardHome != null) dashboardHome.UpdateProtectionStatus(true);
         }
+
+        // Inside Form1.cs
+
+        private void RestoreWindow()
+        {
+            // 1. Make it visible again
+            this.Show();
+
+            // 2. Restore the state from Minimized to Normal
+            this.WindowState = FormWindowState.Normal;
+
+            // 3. Force it to the front and give it focus
+            this.BringToFront();
+            this.Activate();
+        }
         private void Form1_Resize(object sender, EventArgs e)
         {
             // If the user clicked the Minimize button
@@ -210,34 +228,35 @@ namespace CyberShield_V3
         {
             try
             {
-                // 1. Basic checks
                 if (!File.Exists(filePath)) return;
 
-                // Wait a brief moment for the file copy/download to finish locking the file
+                // 1. Wait for file locks
                 Thread.Sleep(500);
 
                 FileInfo fi = new FileInfo(filePath);
-                // Ignore huge files or system files to save performance
                 if (fi.Length > 50 * 1024 * 1024) return;
 
-                // 2. Local Database Scan
+                // 2. Scan
                 ScanResult result = VirusDatabase.ScanFile(filePath);
 
-                // 3. Cloud Scan (Only if local passed and it's an executable)
-                if (!result.IsThreat && IsExecutable(filePath))
+                // 3. Cloud Check (Text files or Executables)
+                if (!result.IsThreat && (IsExecutable(filePath) || filePath.EndsWith(".txt")))
                 {
-                    string hash = CalculateSHA256(filePath);
-                    var cloud = _cloudScanner.QueryByHashAsync(hash).Result; // Synchronous wait in background thread
-
-                    if (cloud.Success && cloud.Samples?.Count > 0)
+                    try
                     {
-                        result.IsThreat = true;
-                        result.ThreatName = cloud.Samples[0].MalwareName ?? "Cloud Threat";
-                        result.Severity = ThreatSeverity.High;
+                        string hash = CalculateSHA256(filePath);
+                        var cloud = _cloudScanner.QueryByHashAsync(hash).Result;
+                        if (cloud.Success && cloud.Samples?.Count > 0)
+                        {
+                            result.IsThreat = true;
+                            result.ThreatName = cloud.Samples[0].MalwareName ?? "Cloud Threat";
+                            result.Severity = ThreatSeverity.High;
+                        }
                     }
+                    catch { /* Cloud timeout/error, ignore */ }
                 }
 
-                // 4. Action: Quarantine & Notify
+                // 4. Act
                 if (result.IsThreat)
                 {
                     var info = new ThreatInfo
@@ -248,24 +267,34 @@ namespace CyberShield_V3
                         DetectedTime = DateTime.Now
                     };
 
-                    detectedThreats.Add(info);
-                    QuarantineFile(info); // Reusing your existing quarantine method
+                    // Try to delete/move
+                    QuarantineFile(info);
 
-                    // 5. Notify the user (Since app might be minimized)
-                    _trayIcon.ShowBalloonTip(5000, "Threat Blocked!",
-                        $"CyberShield protected you from: {result.ThreatName}", ToolTipIcon.Warning);
-
-                    // Safely update UI if visible
+                    // Update UI (Must happen on Main Thread)
                     this.Invoke((MethodInvoker)(() =>
                     {
+                        detectedThreats.Add(info);
+
+                        // Play Sound
+                        System.Media.SystemSounds.Hand.Play();
+
+                        // Show Notification
+                        if (_trayIcon != null)
+                        {
+                            _trayIcon.Visible = true;
+                            _trayIcon.ShowBalloonTip(3000, "THREAT DETECTED",
+                                $"Removed: {result.ThreatName}", ToolTipIcon.Warning);
+                        }
+
+                        // Update Counters
                         if (dashboardHome != null) dashboardHome.UpdateThreatsDetected(detectedThreats.Count);
                         if (scanPanel != null) scanPanel.UpdateThreatsFound(detectedThreats.Count);
                     }));
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Background errors shouldn't crash the app
+                System.Diagnostics.Debug.WriteLine("Scan Error: " + ex.Message);
             }
         }
 
@@ -351,6 +380,8 @@ namespace CyberShield_V3
                 quarantinePanel = new QuarantinePanel();
                 quarantinePanel.Dock = DockStyle.Fill;
                 quarantinePanel.BackClicked += (s, e) => ShowDashboard();
+
+                quarantinePanel.ThreatsChanged += (s, e) => SaveThreatsToDisk();
 
                 // 5. JUNK CLEANER
                 junkCleanerPanel = new JunkCleanerPanel();
@@ -721,27 +752,110 @@ namespace CyberShield_V3
 
         private void QuarantineFile(ThreatInfo threat)
         {
-            try
+            // Retry up to 3 times (helps if file is still being downloaded/written)
+            for (int i = 0; i < 3; i++)
             {
-                string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CyberShield", "Quarantine");
-                Directory.CreateDirectory(folder);
-                string dest = Path.Combine(folder, Path.GetFileName(threat.FilePath) + ".quarantine");
-                File.Move(threat.FilePath, dest);
-                threat.QuarantinedPath = dest;
-                threat.IsQuarantined = true;
+                try
+                {
+                    if (!File.Exists(threat.FilePath)) return; // Already gone
+
+                    string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CyberShield", "Quarantine");
+                    Directory.CreateDirectory(folder);
+
+                    // FIX 1: Generate a UNIQUE name (OriginalName_Timestamp.quarantine)
+                    // This prevents "File already exists" errors if you scan the same threat twice.
+                    string uniqueName = $"{Path.GetFileNameWithoutExtension(threat.FilePath)}_{DateTime.Now.Ticks}{Path.GetExtension(threat.FilePath)}.quarantine";
+                    string dest = Path.Combine(folder, uniqueName);
+
+                    // FIX 2: Move the file
+                    File.Move(threat.FilePath, dest);
+
+                    // Success
+                    threat.QuarantinedPath = dest;
+                    threat.IsQuarantined = true;
+                    SaveThreatsToDisk();
+                    return; // Done
+                }
+                catch (IOException)
+                {
+                    // File is locked (e.g. browser still downloading). Wait 1s and retry.
+                    Thread.Sleep(1000);
+                }
+                catch (Exception ex)
+                {
+                    // Other errors (permission, etc)
+                    threat.QuarantineError = ex.Message;
+                    System.Diagnostics.Debug.WriteLine($"Quarantine Failed: {ex.Message}");
+                    break;
+                }
             }
-            catch (Exception ex) { threat.QuarantineError = ex.Message; }
         }
 
         private bool IsExecutable(string f) { string x = Path.GetExtension(f).ToLower(); return x == ".exe" || x == ".dll" || x == ".bat"; }
 
-        protected override void OnFormClosing(FormClosingEventArgs e) { if (scanCancellationToken != null) scanCancellationToken.Cancel(); base.OnFormClosing(e); }
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // 1. Clean up the Tray Icon so it doesn't get stuck in the taskbar
+            if (_trayIcon != null)
+            {
+                _trayIcon.Visible = false;
+                _trayIcon.Dispose();
+            }
+
+            // 2. Stop the scanner if it's running
+            if (scanCancellationToken != null)
+            {
+                scanCancellationToken.Cancel();
+            }
+
+            SaveThreatsToDisk();
+            base.OnFormClosing(e);
+        }
         private void mainPanel_Paint(object sender, PaintEventArgs e) { }
         private void guna2PictureBox1_Click(object sender, EventArgs e) { }
 
         private void sidePanel_Paint(object sender, PaintEventArgs e)
         {
 
+        }
+
+        private void SaveThreatsToDisk()
+        {
+            try
+            {
+                // Ensure the directory exists before writing
+                string directory = Path.GetDirectoryName(threatsLogPath);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                string json = JsonSerializer.Serialize(detectedThreats, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(threatsLogPath, json);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to save threats: " + ex.Message);
+            }
+        }
+
+        private void LoadThreatsFromDisk()
+        {
+            try
+            {
+                if (File.Exists(threatsLogPath))
+                {
+                    string json = File.ReadAllText(threatsLogPath);
+                    var loadedThreats = JsonSerializer.Deserialize<List<ThreatInfo>>(json);
+                    if (loadedThreats != null)
+                    {
+                        detectedThreats = loadedThreats;
+                        // Verify files still exist in quarantine (optional cleanup)
+                        detectedThreats.RemoveAll(t => t.IsQuarantined && !File.Exists(t.QuarantinedPath));
+                    }
+                }
+            }
+            catch { /* File might be corrupted, start fresh */ }
         }
     }
 }
