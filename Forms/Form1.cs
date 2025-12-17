@@ -49,14 +49,32 @@ namespace CyberShield_V3
         // NEW: Track the signature count locally to update the UI later
         private int _signatureCount = 0;
 
+        // Define a list of extensions that MUST be checked in the cloud
+        private static readonly HashSet<string> CloudTargetExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Executables
+            ".exe", ".dll", ".scr", ".com", ".msi", ".drv", ".sys",
+            // Scripts
+            ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jse", ".wsf",
+            // Documents (Macros & Exploits)
+            ".docm", ".xlsm", ".pptm", ".pdf", ".jar",
+            // Archives (Optional - good to check if the specific zip is known malware)
+            ".zip", ".rar", ".7z", ".iso"
+        };
+
         public Form1(Dictionary<string, string> preloadedHashes)
         {
             try
             {
 
                 string rulesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Rules");
-                Directory.CreateDirectory(rulesPath); // Ensure folder exists
-                _yaraScanner = new YaraScanner(rulesPath);
+                Directory.CreateDirectory(rulesPath); // Keep this to ensure the base folder exists
+
+                // CHANGE: Point directly to the master index file
+                string indexFilePath = Path.Combine(rulesPath, "malware_index.yar");
+
+                // Initialize the scanner with the specific index file
+                _yaraScanner = new YaraScanner(indexFilePath);
 
                 InitializeComponent(); // Loads Form1.Designer.cs
                 this.TransparencyKey = Color.Empty;
@@ -128,6 +146,7 @@ namespace CyberShield_V3
             if (scanButton != null) scanButton.Enabled = isEnabled;
             if (cleanButton != null) cleanButton.Enabled = isEnabled;
             if (settingsButton != null) settingsButton.Enabled = isEnabled;
+            if (securityButton != null) securityButton.Enabled = isEnabled;
 
             // Optional: If you want to disable dragging the form during scan
             // if (guna2GradientPanel1 != null) guna2GradientPanel1.Enabled = isEnabled;
@@ -232,34 +251,51 @@ namespace CyberShield_V3
             await Task.Run(() => ScanBackgroundFile(e.FullPath));
         }
 
-        private void ScanBackgroundFile(string filePath)
+        // CHANGED: "async Task" allows us to use 'await' correctly
+        private async Task ScanBackgroundFile(string filePath)
         {
             try
             {
                 if (!File.Exists(filePath)) return;
 
-                // 1. Wait for file locks
-                Thread.Sleep(500);
+                // 1. ROBUST WAIT: Retry loop for file locks 
+                // (Browsers lock files while downloading; we must wait until they finish)
+                int retries = 0;
+                while (IsFileLocked(filePath) && retries < 5)
+                {
+                    await Task.Delay(500); // Wait 0.5s
+                    retries++;
+                }
+
+                // If still locked after 2.5s, skip it (it might be a system file)
+                if (IsFileLocked(filePath)) return;
 
                 FileInfo fi = new FileInfo(filePath);
-                if (fi.Length > 50 * 1024 * 1024) return;
+                if (fi.Length > 50 * 1024 * 1024) return; // Skip files > 50MB
 
-                // 2. Scan
+                // 2. Scan: Local Database (Fast)
                 ScanResult result = VirusDatabase.ScanFile(filePath);
 
+                // 3. Scan: YARA (Heuristic)
+                // Only run if local DB is clean
                 if (!result.IsThreat && _yaraScanner != null)
                 {
                     ScanResult yaraResult = _yaraScanner.ScanFile(filePath);
                     if (yaraResult.IsThreat) result = yaraResult;
                 }
 
-                // 3. Cloud Check (Text files or Executables)
-                if (!result.IsThreat && (IsExecutable(filePath) || filePath.EndsWith(".txt")))
+                // 4. Scan: Cloud (Intelligence)
+                // CHANGED: Added 'await' to prevent deadlocks
+                string ext = Path.GetExtension(filePath);
+
+                if (!result.IsThreat && CloudTargetExtensions.Contains(ext))
                 {
                     try
                     {
                         string hash = CalculateSHA256(filePath);
-                        var cloud = _cloudScanner.QueryByHashAsync(hash).Result;
+
+                        var cloud = await _cloudScanner.QueryByHashAsync(hash);
+
                         if (cloud.Success && cloud.Samples?.Count > 0)
                         {
                             result.IsThreat = true;
@@ -267,10 +303,10 @@ namespace CyberShield_V3
                             result.Severity = ThreatSeverity.High;
                         }
                     }
-                    catch { /* Cloud timeout/error, ignore */ }
+                    catch { /* Ignore cloud errors */ }
                 }
 
-                // 4. Act
+                // 5. Act
                 if (result.IsThreat)
                 {
                     var info = new ThreatInfo
@@ -281,20 +317,18 @@ namespace CyberShield_V3
                         DetectedTime = DateTime.Now
                     };
 
-                    // Try to delete/move
+                    // Attempt Quarantine
                     QuarantineFile(info);
 
-                    // Update UI (Must happen on Main Thread)
+                    // Update UI (Main Thread)
                     this.Invoke((MethodInvoker)(() =>
                     {
                         detectedThreats.Add(info);
 
                         if (securityPanel != null) securityPanel.AddThreatRealTime(info);
 
-                        // Play Sound
                         System.Media.SystemSounds.Hand.Play();
 
-                        // Show Notification
                         if (_trayIcon != null)
                         {
                             _trayIcon.Visible = true;
@@ -302,7 +336,6 @@ namespace CyberShield_V3
                                 $"Removed: {result.ThreatName}", ToolTipIcon.Warning);
                         }
 
-                        // Update Counters
                         if (dashboardHome != null) dashboardHome.UpdateThreatsDetected(detectedThreats.Count);
                         if (scanPanel != null) scanPanel.UpdateThreatsFound(detectedThreats.Count);
                     }));
@@ -312,6 +345,23 @@ namespace CyberShield_V3
             {
                 System.Diagnostics.Debug.WriteLine("Scan Error: " + ex.Message);
             }
+        }
+
+        // Helper helper to check for locks without crashing
+        private bool IsFileLocked(string filePath)
+        {
+            try
+            {
+                using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    stream.Close();
+                }
+            }
+            catch (IOException)
+            {
+                return true; // File is locked
+            }
+            return false; // File is free
         }
 
         private async void CheckCloudStatus()
@@ -597,14 +647,26 @@ namespace CyberShield_V3
             try
             {
                 string[] directories;
+
+                // 1. SAFE UI UPDATE: Use Invoke
+                this.Invoke((MethodInvoker)(() =>
+                {
+                    if (isDeepScan)
+                    {
+                        scanPanel?.UpdateStatus("Initializing Deep Scan...");
+                    }
+                    else
+                    {
+                        scanPanel?.UpdateStatus("Initializing Quick Scan...");
+                    }
+                }));
+
                 if (isDeepScan)
                 {
-                    scanPanel?.UpdateStatus("Initializing Deep Scan...");
                     directories = Directory.GetLogicalDrives();
                 }
                 else
                 {
-                    scanPanel?.UpdateStatus("Initializing Quick Scan...");
                     directories = new string[] {
                 Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
                 Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -613,104 +675,258 @@ namespace CyberShield_V3
             };
                 }
 
-                if (scanPanel != null) scanPanel.UpdateStatus("Counting files...");
+                // 2. SAFE UI UPDATE
+                this.Invoke((MethodInvoker)(() =>
+                {
+                    if (scanPanel != null) scanPanel.UpdateStatus("Counting files...");
+                }));
 
+                // 3. Count Files (Heavy work - Keep on background thread)
                 int totalFiles = 0;
                 foreach (var dir in directories)
                 {
-                    if (_stopRequested) break; // CHECK KILL SWITCH
+                    if (_stopRequested) break;
                     if (isDeepScan || Directory.Exists(dir)) totalFiles += CountFiles(dir, token, isDeepScan);
                 }
                 if (totalFiles == 0) totalFiles = 1;
 
-                if (scanPanel != null) scanPanel.UpdateStatus($"Scanning {totalFiles} files...");
+                // 4. SAFE UI UPDATE
+                this.Invoke((MethodInvoker)(() =>
+                {
+                    if (scanPanel != null) scanPanel.UpdateStatus($"Scanning {totalFiles} files...");
+                }));
 
                 int scannedFiles = 0;
                 _uiUpdateStopwatch.Restart();
 
+                // 5. Start Scanning
                 foreach (var dir in directories)
                 {
-                    if (_stopRequested) break; // CHECK KILL SWITCH
+                    if (_stopRequested) break;
                     if (isDeepScan || Directory.Exists(dir)) ScanDirectory(dir, ref scannedFiles, totalFiles, token, isDeepScan);
                 }
 
                 // --- FINAL STOP CHECK ---
                 if (_stopRequested || token.IsCancellationRequested)
                 {
-                    if (scanPanel != null)
+                    // SAFE UI UPDATE
+                    this.Invoke((MethodInvoker)(() =>
                     {
-                        scanPanel.UpdateStatus("Scan Cancelled");
-                        scanPanel.ScanComplete(true);
-                    }
+                        if (scanPanel != null)
+                        {
+                            scanPanel.UpdateStatus("Scan Cancelled");
+                            scanPanel.ScanComplete(true);
+                        }
+                    }));
                     return;
                 }
 
                 if (_scanHistory != null) _scanHistory.Save();
 
-                if (scanPanel != null)
+                // SAFE UI UPDATE
+                this.Invoke((MethodInvoker)(() =>
                 {
-                    scanPanel.UpdateProgress(100);
-                    scanPanel.UpdateStatus("Scan Complete");
-                    Thread.Sleep(500);
-                    scanPanel.ScanComplete(false);
-                }
+                    if (scanPanel != null)
+                    {
+                        scanPanel.UpdateProgress(100);
+                        scanPanel.UpdateStatus("Scan Complete");
+                    }
+                }));
+
+                Thread.Sleep(500); // Small pause so user sees "100%"
+
+                // SAFE UI UPDATE
+                this.Invoke((MethodInvoker)(() =>
+                {
+                    if (scanPanel != null) scanPanel.ScanComplete(false);
+                }));
             }
-            catch
+            catch (Exception ex)
             {
-                if (scanPanel != null) scanPanel.ScanComplete(true);
+                // SAFE UI UPDATE
+                this.Invoke((MethodInvoker)(() =>
+                {
+                    if (scanPanel != null) scanPanel.ScanComplete(true);
+                    // Optional: Show error for debugging
+                    // MessageBox.Show(ex.Message); 
+                }));
             }
         }
 
         private int CountFiles(string path, CancellationToken token, bool deep)
         {
+            // 1. Safety Checks
             if (token.IsCancellationRequested) return 0;
+
             int count = 0;
-            try { count += Directory.GetFiles(path).Length; } catch { return 0; }
+
+            // 2. Count Files (Isolated Try/Catch)
+            // If this fails (Access Denied), we still want to try checking subfolders!
+            try
+            {
+                count += Directory.GetFiles(path).Length;
+            }
+            catch
+            {
+                // Ignore file errors, count remains 0 for this specific folder 
+            }
+
+            // 3. Check Subdirectories (Isolated Try/Catch)
             try
             {
                 foreach (var sub in Directory.GetDirectories(path))
                 {
                     if (token.IsCancellationRequested) break;
+
                     string name = Path.GetFileName(sub).ToLower();
-                    if (!deep && (name == "windows" || name == "program files" || name == "appdata")) continue;
-                    if (name.StartsWith("$")) continue;
+
+                    // Skip protected system folders to prevent loops/errors
+                    if (name.StartsWith("$") || name == "system volume information") continue;
+
+                    // Quick Scan Optimization
+                    if (!deep && (name == "windows" || name == "program files" || name == "program files (x86)" || name == "appdata")) continue;
+
+                    // Recursive Call
                     count += CountFiles(sub, token, deep);
                 }
             }
-            catch { }
+            catch
+            {
+                // Ignore directory access errors (e.g., cannot open folder)
+            }
+
             return count;
         }
 
         private void ScanDirectory(string path, ref int scanned, int total, CancellationToken token, bool deep)
         {
-            // 1. Immediate Check
-            if (_stopRequested) return;
+            if (_stopRequested || token.IsCancellationRequested) return;
 
             try
             {
-                string[] files = Directory.GetFiles(path);
+                var files = Directory.EnumerateFiles(path);
+
                 foreach (var file in files)
                 {
-                    // 2. CRITICAL CHECK inside the loop
-                    if (_stopRequested) return;
+                    if (_stopRequested || token.IsCancellationRequested) return;
 
-                    ScanFile(file, ref scanned, total, token);
+                    try
+                    {
+                        FileInfo fi = new FileInfo(file);
+                        if (fi.Length > 50 * 1024 * 1024) continue;
+
+                        // --- SCANNING LOGIC ---
+                        ScanResult result = VirusDatabase.ScanFile(file);
+
+                        if (!result.IsThreat && _yaraScanner != null)
+                        {
+                            if (IsScannableExtension(file))
+                            {
+                                var yaraResult = _yaraScanner.ScanFile(file);
+                                if (yaraResult.IsThreat) result = yaraResult;
+                            }
+                        }
+
+                        if (result.IsThreat)
+                        {
+                            HandleThreatFound(file, result);
+                        }
+                        // -----------------------
+
+                        scanned++;
+
+                        // Update every 10 files 
+                        if (scanned < 10 || scanned % 10 == 0)
+                        {
+                            // FIX: Copy 'ref' value to a local variable for the lambda
+                            int currentCount = scanned;
+                            int progress = (int)((double)scanned / total * 100);
+
+                            this.Invoke((MethodInvoker)(() =>
+                            {
+                                if (scanPanel != null)
+                                {
+                                    scanPanel.UpdateProgress(progress);
+                                    scanPanel.UpdateStatus($"Scanning: {Path.GetFileName(file)}");
+
+                                    // Use the LOCAL copy, not the 'ref' variable
+                                    scanPanel.UpdateFilesScanned(currentCount);
+                                }
+                            }));
+                        }
+                    }
+                    catch { }
                 }
 
-                string[] dirs = Directory.GetDirectories(path);
+                var dirs = Directory.EnumerateDirectories(path);
                 foreach (var sub in dirs)
                 {
-                    // 3. CRITICAL CHECK inside the loop
-                    if (_stopRequested) return;
+                    if (_stopRequested || token.IsCancellationRequested) return;
 
                     string name = Path.GetFileName(sub).ToLower();
-                    if (!deep && (name == "windows" || name == "program files" || name == "appdata")) continue;
-                    if (name.StartsWith("$")) continue;
+                    if (name.StartsWith("$") || name == "system volume information") continue;
+                    if (!deep && (name == "windows" || name == "program files" || name == "program files (x86)" || name == "appdata")) continue;
 
                     ScanDirectory(sub, ref scanned, total, token, deep);
                 }
             }
             catch { }
+        }
+
+        private void HandleThreatFound(string filePath, ScanResult result)
+        {
+            // 1. Create the Threat Info object
+            var info = new ThreatInfo
+            {
+                FilePath = filePath,
+                ThreatName = result.ThreatName,
+                Severity = result.Severity,
+                DetectedTime = DateTime.Now
+            };
+
+            // 2. Quarantine / Delete the file (Disk Operation)
+            QuarantineFile(info);
+
+            // 3. Update the UI (Must be done on the UI Thread)
+            this.Invoke((MethodInvoker)(() =>
+            {
+                // Add to local list
+                detectedThreats.Add(info);
+
+                // Update the Security Panel (if visible)
+                if (securityPanel != null)
+                    securityPanel.AddThreatRealTime(info);
+
+                // Play Alert Sound
+                try { System.Media.SystemSounds.Hand.Play(); } catch { }
+
+                // Show Tray Notification
+                if (_trayIcon != null)
+                {
+                    _trayIcon.Visible = true;
+                    _trayIcon.ShowBalloonTip(3000, "THREAT DETECTED",
+                        $"Removed: {result.ThreatName}", ToolTipIcon.Warning);
+                }
+
+                // Update Dashboard Counters
+                if (dashboardHome != null)
+                    dashboardHome.UpdateThreatsDetected(detectedThreats.Count);
+
+                // Update Scan Panel Counters (Specific to the manual scan page)
+                if (scanPanel != null)
+                    scanPanel.UpdateThreatsFound(detectedThreats.Count);
+            }));
+        }
+
+        private bool IsScannableExtension(string filePath)
+        {
+            string ext = Path.GetExtension(filePath).ToLower();
+
+            // List of files that CAN contain code or scripts
+            return ext == ".exe" || ext == ".dll" || ext == ".bat" ||
+                   ext == ".ps1" || ext == ".vbs" || ext == ".js" ||
+                   ext == ".msi" || ext == ".com" || ext == ".scr" ||
+                   ext == ".docm" || ext == ".xlsm" || ext == ".jar";
         }
 
         private void ScanFile(string file, ref int scanned, int total, CancellationToken token)

@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using System.Net.Http;
 using System.IO;
 using System.Collections.Generic;
+using System.Text.RegularExpressions; // Add this at the top
 
 namespace CyberShield_V3.Panels
 {
@@ -41,55 +42,105 @@ namespace CyberShield_V3.Panels
             ProtectionToggled?.Invoke(this, isOn);
         }
 
+        // Helper function to download an index and its dependencies
+        private async Task DownloadRulesFromIndex(HttpClient client, string baseUrl, string indexFileName, string localSavePath)
+        {
+            try
+            {
+                // 1. Construct the full URL for the index file
+                string indexUrl = $"{baseUrl}/{indexFileName}";
+
+                // 2. Download the Index File content
+                // (This gets the text list of all other files we need)
+                string indexContent = await client.GetStringAsync(indexUrl);
+
+                // 3. Save the Index File locally
+                string localIndexDetails = Path.Combine(localSavePath, indexFileName);
+                await File.WriteAllTextAsync(localIndexDetails, indexContent);
+
+                // 4. Parse the content for "include" directives
+                // This Regex finds lines like: include "./malware/APT_Backspace.yar"
+                // It handles both forward slashes (/) and backslashes (\)
+                var matches = Regex.Matches(indexContent, "include\\s+\"\\./?([^\"]+)\"");
+
+                foreach (Match match in matches)
+                {
+                    // Extract the filename (e.g., "malware/APT_Backspace.yar")
+                    string childFileName = match.Groups[1].Value;
+
+                    // Construct the full local path where we want to save it
+                    string localChildPath = Path.Combine(localSavePath, childFileName);
+
+                    // Construct the web URL to download it from
+                    // We use Replace to ensure web URLs always use forward slashes
+                    string childUrl = $"{baseUrl}/{childFileName}".Replace("\\", "/");
+
+                    try
+                    {
+                        // === THE FIX: Create the subdirectory if it doesn't exist ===
+                        string directoryPath = Path.GetDirectoryName(localChildPath);
+                        if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath))
+                        {
+                            Directory.CreateDirectory(directoryPath);
+                        }
+
+                        // Download the child file
+                        string childContent = await client.GetStringAsync(childUrl);
+
+                        // Save it
+                        await File.WriteAllTextAsync(localChildPath, childContent);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log error but continue downloading other files
+                        // This prevents one bad link from stopping the whole update
+                        System.Diagnostics.Debug.WriteLine($"Failed to download {childFileName}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // This catches errors with the main index file itself
+                MessageBox.Show($"Failed to download index file: {ex.Message}");
+                throw; // Re-throw so the button click knows something went wrong
+            }
+        }
+
         private async void btnUpdateRules_Click(object sender, EventArgs e)
         {
             btnUpdateRules.Enabled = false;
-            btnUpdateRules.Text = "Updating...";
-            lblUpdateStatus.Text = "Connecting...";
+            lblUpdateStatus.Text = "Downloading definitions...";
 
-            var ruleUrls = new Dictionary<string, string>
-    {
-        { "malware_rules.yar", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Misc.yar" }
-    };
-
+            // 1. Define the Base URL (The folder where the files live)
+            // We remove the filename so we can append other filenames to it later.
+            string baseUrl = "https://raw.githubusercontent.com/Yara-Rules/rules/master";
+            // 2. The main file that lists all other files
+            string indexFile = "malware_index.yar";
             try
             {
-                // 1. Ensure modern security protocols are used
                 System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12 | System.Net.SecurityProtocolType.Tls13;
 
                 using (HttpClient client = new HttpClient())
                 {
-                    // 2. CRITICAL: Add a User-Agent header (GitHub rejects requests without this)
                     client.DefaultRequestHeaders.Add("User-Agent", "CyberShield-Antivirus-Project");
 
                     string rulesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Rules");
                     if (!Directory.Exists(rulesPath)) Directory.CreateDirectory(rulesPath);
 
-                    foreach (var rule in ruleUrls)
-                    {
-                        // This line usually throws the HttpRequestException if User-Agent is missing
-                        string content = await client.GetStringAsync(rule.Value);
-                        await File.WriteAllTextAsync(Path.Combine(rulesPath, rule.Key), content);
-                    }
+                    // CALL THE HELPER FUNCTION
+                    await DownloadRulesFromIndex(client, baseUrl, indexFile, rulesPath);
 
-                    lblUpdateStatus.Text = $"Last updated: {DateTime.Now.ToShortTimeString()}";
-                    MessageBox.Show("Rules updated successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    lblUpdateStatus.Text = $"Updated: {DateTime.Now.ToShortTimeString()}";
+                    MessageBox.Show("All malware rules and dependencies downloaded!", "Update Complete");
                 }
-            }
-            catch (HttpRequestException httpEx)
-            {
-                lblUpdateStatus.Text = "Network Error!";
-                MessageBox.Show($"Could not connect to GitHub. Check your internet.\n\nDetails: {httpEx.Message}", "Connection Error");
             }
             catch (Exception ex)
             {
-                lblUpdateStatus.Text = "Update failed!";
-                MessageBox.Show($"Update Error: {ex.Message}", "Error");
+                MessageBox.Show($"Update Error: {ex.Message}");
             }
             finally
             {
                 btnUpdateRules.Enabled = true;
-                btnUpdateRules.Text = "Update YARA Rules";
             }
         }
 
