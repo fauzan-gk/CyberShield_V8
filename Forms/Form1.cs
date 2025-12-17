@@ -1,16 +1,18 @@
 ﻿using CyberShield_V3.Models;
 using CyberShield_V3.Panels;
 using CyberShield_V3.Services;
+using CyberShield_V4.Panels;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Text.Json;
+
 
 namespace CyberShield_V3
 {
@@ -23,10 +25,11 @@ namespace CyberShield_V3
         private JunkCleanerPanel junkCleanerPanel;
         private ScanHomePanel scanHomePanel;
         private SettingsPanel settingsPanel;
+        private SecurityPanel securityPanel;
 
         private string threatsLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CyberShield", "threats_log.json");
 
-
+        private YaraScanner _yaraScanner;
         private volatile bool _stopRequested = false;
 
         private System.Diagnostics.Stopwatch _uiUpdateStopwatch = new System.Diagnostics.Stopwatch();
@@ -50,6 +53,11 @@ namespace CyberShield_V3
         {
             try
             {
+
+                string rulesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Rules");
+                Directory.CreateDirectory(rulesPath); // Ensure folder exists
+                _yaraScanner = new YaraScanner(rulesPath);
+
                 InitializeComponent(); // Loads Form1.Designer.cs
                 this.TransparencyKey = Color.Empty;
                 this.BackColor = Color.FromArgb(34, 67, 92);
@@ -239,6 +247,12 @@ namespace CyberShield_V3
                 // 2. Scan
                 ScanResult result = VirusDatabase.ScanFile(filePath);
 
+                if (!result.IsThreat && _yaraScanner != null)
+                {
+                    ScanResult yaraResult = _yaraScanner.ScanFile(filePath);
+                    if (yaraResult.IsThreat) result = yaraResult;
+                }
+
                 // 3. Cloud Check (Text files or Executables)
                 if (!result.IsThreat && (IsExecutable(filePath) || filePath.EndsWith(".txt")))
                 {
@@ -274,6 +288,8 @@ namespace CyberShield_V3
                     this.Invoke((MethodInvoker)(() =>
                     {
                         detectedThreats.Add(info);
+
+                        if (securityPanel != null) securityPanel.AddThreatRealTime(info);
 
                         // Play Sound
                         System.Media.SystemSounds.Hand.Play();
@@ -388,6 +404,14 @@ namespace CyberShield_V3
                 junkCleanerPanel.Dock = DockStyle.Fill;
                 junkCleanerPanel.BackClicked += (s, e) => ShowDashboard();
 
+                // 7. SECURITY PANEL
+                securityPanel = new SecurityPanel();
+                securityPanel.Dock = DockStyle.Fill;
+                securityPanel.ProtectionToggled += (s, active) => {
+                    // Logic to enable/disable FileSystemWatchers
+                    foreach (var p in _protectors) p.EnableRaisingEvents = active;
+                };
+
                 // 6. SETTINGS
                 settingsPanel = new SettingsPanel();
                 settingsPanel.Dock = DockStyle.Fill;
@@ -419,6 +443,8 @@ namespace CyberShield_V3
                 mainPanel.Controls.Add(quarantinePanel);
                 mainPanel.Controls.Add(junkCleanerPanel);
                 mainPanel.Controls.Add(settingsPanel);
+                mainPanel.Controls.Add(securityPanel);
+
             }
             catch (Exception ex)
             {
@@ -433,6 +459,7 @@ namespace CyberShield_V3
             if (scanButton != null) scanButton.Click += (s, e) => ShowScanHome();
             if (cleanButton != null) cleanButton.Click += (s, e) => ShowJunkCleaner();
             if (settingsButton != null) settingsButton.Click += (s, e) => ShowSettings();
+            if (securityButton != null) securityButton.Click += (s, e) => ShowSecurityPanel();
 
             if (guna2GradientPanel1 != null)
             {
@@ -478,6 +505,13 @@ namespace CyberShield_V3
             if (homeButton != null) homeButton.Checked = false;
             if (scanButton != null) scanButton.Checked = true;
             if (cleanButton != null) cleanButton.Checked = false;
+        }
+
+        private void ShowSecurityPanel()
+        {
+            securityPanel.RefreshSecurityData(detectedThreats, true); // Replace true with your actual protection state variable
+            SetActivePanel(securityPanel);
+            // Set button checked states...
         }
 
         private void ShowScanPanel()
@@ -681,16 +715,15 @@ namespace CyberShield_V3
 
         private void ScanFile(string file, ref int scanned, int total, CancellationToken token)
         {
-            // 1. Stop immediately
+            // 1. Stop immediately if user cancelled
             if (_stopRequested) return;
 
             scanned++;
             try
             {
-                // UI Updates
+                // UI Updates (Counters and Progress bar)
                 if (_uiUpdateStopwatch.ElapsedMilliseconds > 100 || scanned == total)
                 {
-                    // If stopped, DO NOT update UI anymore to prevent "flickering" effect
                     if (_stopRequested) return;
 
                     if (scanPanel != null)
@@ -702,11 +735,28 @@ namespace CyberShield_V3
                     _uiUpdateStopwatch.Restart();
                 }
 
+                // Optimization: Skip if file hasn't changed since last scan
                 if (_scanHistory != null && !_scanHistory.NeedsScanning(file)) return;
 
+                // --- LAYER 1: LOCAL SIGNATURE DATABASE SCAN ---
                 if (_stopRequested) return;
                 ScanResult result = VirusDatabase.ScanFile(file);
 
+                // --- LAYER 2: YARA PATTERN SCAN (NEW) ---
+                // We only run YARA if the local database didn't already find something
+                if (!result.IsThreat && _yaraScanner != null)
+                {
+                    if (_stopRequested) return;
+
+                    // This looks inside the file for malicious code patterns defined in your .yar files
+                    ScanResult yaraResult = _yaraScanner.ScanFile(file);
+                    if (yaraResult.IsThreat)
+                    {
+                        result = yaraResult;
+                    }
+                }
+
+                // --- LAYER 3: CLOUD SCAN (MALWAREBAZAAR) ---
                 if (!result.IsThreat && IsExecutable(file))
                 {
                     try
@@ -727,22 +777,42 @@ namespace CyberShield_V3
                             result.Severity = ThreatSeverity.High;
                         }
                     }
-                    catch { }
+                    catch { /* Network error or timeout, skip cloud for this file */ }
                 }
 
+                // FINAL ACTION: If any layer found a threat, handle it
                 if (result.IsThreat)
                 {
-                    var info = new ThreatInfo { FilePath = file, ThreatName = result.ThreatName, Severity = result.Severity, DetectedTime = DateTime.Now };
+                    var info = new ThreatInfo
+                    {
+                        FilePath = file,
+                        ThreatName = result.ThreatName,
+                        Severity = result.Severity,
+                        DetectedTime = DateTime.Now
+                    };
+
                     detectedThreats.Add(info);
+
+                    // Update the Security Panel in real-time
+                    this.Invoke((MethodInvoker)(() => {
+                        if (securityPanel != null) securityPanel.AddThreatRealTime(info);
+                    }));
+
                     if (scanPanel != null) scanPanel.UpdateThreatsFound(detectedThreats.Count);
+
+                    // Move file to quarantine
                     QuarantineFile(info);
                 }
                 else if (_scanHistory != null)
                 {
+                    // If clean, mark it so we don't scan it again until it changes
                     _scanHistory.MarkAsScanned(file);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error scanning {file}: {ex.Message}");
+            }
         }
 
         private string CalculateSHA256(string file)
