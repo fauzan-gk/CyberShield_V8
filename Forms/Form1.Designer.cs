@@ -31,6 +31,8 @@
             components = new System.ComponentModel.Container();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges11 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges12 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges1 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges2 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges3 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges4 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges5 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
@@ -53,10 +55,9 @@
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges22 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.AnimatorNS.Animation animation1 = new Guna.UI2.AnimatorNS.Animation();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges1 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges2 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             guna2Elipse1 = new Guna.UI2.WinForms.Guna2Elipse(components);
             sidePanel = new Guna.UI2.WinForms.Guna2Panel();
+            securityButton = new Guna.UI2.WinForms.Guna2Button();
             settingsButton = new Guna.UI2.WinForms.Guna2Button();
             cleanButton = new Guna.UI2.WinForms.Guna2Button();
             homeButton = new Guna.UI2.WinForms.Guna2Button();
@@ -79,7 +80,6 @@
             guna2HtmlLabel1 = new Guna.UI2.WinForms.Guna2HtmlLabel();
             guna2Transition1 = new Guna.UI2.WinForms.Guna2Transition();
             guna2Elipse9 = new Guna.UI2.WinForms.Guna2Elipse(components);
-            securityButton = new Guna.UI2.WinForms.Guna2Button();
             guna2Elipse10 = new Guna.UI2.WinForms.Guna2Elipse(components);
             guna2Elipse11 = new Guna.UI2.WinForms.Guna2Elipse(components);
             sidePanel.SuspendLayout();
@@ -108,6 +108,36 @@
             sidePanel.Size = new Size(139, 442);
             sidePanel.TabIndex = 0;
             sidePanel.Paint += sidePanel_Paint;
+            // 
+            // securityButton
+            // 
+            securityButton.BackColor = Color.Transparent;
+            securityButton.ButtonMode = Guna.UI2.WinForms.Enums.ButtonMode.RadioButton;
+            securityButton.CheckedState.FillColor = Color.FromArgb(16, 185, 129);
+            securityButton.CustomBorderColor = Color.MediumSpringGreen;
+            securityButton.CustomizableEdges = customizableEdges1;
+            guna2Transition1.SetDecoration(securityButton, Guna.UI2.AnimatorNS.DecorationType.None);
+            securityButton.DisabledState.BorderColor = Color.DarkGray;
+            securityButton.DisabledState.CustomBorderColor = Color.DarkGray;
+            securityButton.DisabledState.FillColor = Color.FromArgb(34, 67, 92);
+            securityButton.DisabledState.ForeColor = Color.White;
+            securityButton.FillColor = Color.FromArgb(34, 67, 92);
+            securityButton.FocusedColor = Color.FromArgb(30, 41, 59);
+            securityButton.Font = new Font("Segoe UI", 9F);
+            securityButton.ForeColor = Color.White;
+            securityButton.HoverState.FillColor = Color.FromArgb(30, 41, 59);
+            securityButton.Image = (Image)resources.GetObject("securityButton.Image");
+            securityButton.Location = new Point(7, 199);
+            securityButton.Name = "securityButton";
+            securityButton.PressedColor = Color.FromArgb(30, 41, 59);
+            securityButton.PressedDepth = 20;
+            securityButton.ShadowDecoration.CustomizableEdges = customizableEdges2;
+            securityButton.ShadowDecoration.Depth = 10;
+            securityButton.ShadowDecoration.Enabled = true;
+            securityButton.Size = new Size(127, 56);
+            securityButton.TabIndex = 4;
+            securityButton.Text = "Security";
+            securityButton.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             // 
             // settingsButton
             // 
@@ -408,36 +438,6 @@
             // 
             guna2Elipse9.BorderRadius = 15;
             guna2Elipse9.TargetControl = settingsButton;
-            // 
-            // securityButton
-            // 
-            securityButton.BackColor = Color.Transparent;
-            securityButton.ButtonMode = Guna.UI2.WinForms.Enums.ButtonMode.RadioButton;
-            securityButton.CheckedState.FillColor = Color.FromArgb(16, 185, 129);
-            securityButton.CustomBorderColor = Color.MediumSpringGreen;
-            securityButton.CustomizableEdges = customizableEdges1;
-            guna2Transition1.SetDecoration(securityButton, Guna.UI2.AnimatorNS.DecorationType.None);
-            securityButton.DisabledState.BorderColor = Color.DarkGray;
-            securityButton.DisabledState.CustomBorderColor = Color.DarkGray;
-            securityButton.DisabledState.FillColor = Color.FromArgb(34, 67, 92);
-            securityButton.DisabledState.ForeColor = Color.White;
-            securityButton.FillColor = Color.FromArgb(34, 67, 92);
-            securityButton.FocusedColor = Color.FromArgb(30, 41, 59);
-            securityButton.Font = new Font("Segoe UI", 9F);
-            securityButton.ForeColor = Color.White;
-            securityButton.HoverState.FillColor = Color.FromArgb(30, 41, 59);
-            securityButton.Image = (Image)resources.GetObject("securityButton.Image");
-            securityButton.Location = new Point(7, 199);
-            securityButton.Name = "securityButton";
-            securityButton.PressedColor = Color.FromArgb(30, 41, 59);
-            securityButton.PressedDepth = 20;
-            securityButton.ShadowDecoration.CustomizableEdges = customizableEdges2;
-            securityButton.ShadowDecoration.Depth = 10;
-            securityButton.ShadowDecoration.Enabled = true;
-            securityButton.Size = new Size(127, 56);
-            securityButton.TabIndex = 4;
-            securityButton.Text = "Security";
-            securityButton.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             // 
             // guna2Elipse11
             // 

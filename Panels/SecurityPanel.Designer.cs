@@ -14,11 +14,11 @@
 
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges1 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges2 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges3 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges4 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             dgvThreats = new Guna.UI2.WinForms.Guna2DataGridView();
             colDate = new DataGridViewTextBoxColumn();
             colName = new DataGridViewTextBoxColumn();
@@ -29,30 +29,31 @@
             label2 = new Label();
             lblThreatCount = new Label();
             label5 = new Label();
+            titleLabel = new Label();
             ((System.ComponentModel.ISupportInitialize)dgvThreats).BeginInit();
             SuspendLayout();
             // 
             // dgvThreats
             // 
-            dataGridViewCellStyle1.BackColor = Color.FromArgb(44, 48, 52);
-            dgvThreats.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
-            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle2.BackColor = Color.FromArgb(15, 16, 18);
-            dataGridViewCellStyle2.Font = new Font("Segoe UI", 9F);
-            dataGridViewCellStyle2.ForeColor = Color.White;
-            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.True;
-            dgvThreats.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle4.BackColor = Color.FromArgb(44, 48, 52);
+            dgvThreats.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle4;
+            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle5.BackColor = Color.FromArgb(15, 16, 18);
+            dataGridViewCellStyle5.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle5.ForeColor = Color.White;
+            dataGridViewCellStyle5.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.True;
+            dgvThreats.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle5;
             dgvThreats.Columns.AddRange(new DataGridViewColumn[] { colDate, colName, colSeverity, colAction });
-            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle3.BackColor = Color.FromArgb(33, 37, 41);
-            dataGridViewCellStyle3.Font = new Font("Segoe UI", 9F);
-            dataGridViewCellStyle3.ForeColor = Color.White;
-            dataGridViewCellStyle3.SelectionBackColor = Color.FromArgb(114, 117, 119);
-            dataGridViewCellStyle3.SelectionForeColor = Color.White;
-            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.False;
-            dgvThreats.DefaultCellStyle = dataGridViewCellStyle3;
+            dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle6.BackColor = Color.FromArgb(33, 37, 41);
+            dataGridViewCellStyle6.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle6.ForeColor = Color.White;
+            dataGridViewCellStyle6.SelectionBackColor = Color.FromArgb(114, 117, 119);
+            dataGridViewCellStyle6.SelectionForeColor = Color.White;
+            dataGridViewCellStyle6.WrapMode = DataGridViewTriState.False;
+            dgvThreats.DefaultCellStyle = dataGridViewCellStyle6;
             dgvThreats.GridColor = Color.FromArgb(50, 56, 62);
             dgvThreats.Location = new Point(28, 101);
             dgvThreats.Name = "dgvThreats";
@@ -120,10 +121,10 @@
             // toggleRealTime
             // 
             toggleRealTime.CheckedState.FillColor = Color.Lime;
-            toggleRealTime.CustomizableEdges = customizableEdges1;
+            toggleRealTime.CustomizableEdges = customizableEdges3;
             toggleRealTime.Location = new Point(162, 63);
             toggleRealTime.Name = "toggleRealTime";
-            toggleRealTime.ShadowDecoration.CustomizableEdges = customizableEdges2;
+            toggleRealTime.ShadowDecoration.CustomizableEdges = customizableEdges4;
             toggleRealTime.Size = new Size(35, 20);
             toggleRealTime.TabIndex = 3;
             toggleRealTime.UncheckedState.FillColor = Color.Transparent;
@@ -156,9 +157,21 @@
             label5.TabIndex = 5;
             label5.Text = "Threats Blocked";
             // 
+            // titleLabel
+            // 
+            titleLabel.AutoSize = true;
+            titleLabel.Font = new Font("Segoe UI", 20F, FontStyle.Bold);
+            titleLabel.ForeColor = Color.White;
+            titleLabel.Location = new Point(28, 13);
+            titleLabel.Name = "titleLabel";
+            titleLabel.Size = new Size(237, 37);
+            titleLabel.TabIndex = 6;
+            titleLabel.Text = "Detected Threats";
+            // 
             // SecurityPanel
             // 
             BackColor = Color.FromArgb(30, 33, 57);
+            Controls.Add(titleLabel);
             Controls.Add(dgvThreats);
             Controls.Add(label1);
             Controls.Add(toggleRealTime);
@@ -168,6 +181,7 @@
             Size = new Size(725, 442);
             ((System.ComponentModel.ISupportInitialize)dgvThreats).EndInit();
             ResumeLayout(false);
+            PerformLayout();
         }
         private Guna.UI2.WinForms.Guna2DataGridView dgvThreats;
         private DataGridViewTextBoxColumn colDate;
@@ -178,5 +192,6 @@
         private Label label1;
         private Label lblThreatCount;
         private Label label5;
+        private Label titleLabel;
     }
 }

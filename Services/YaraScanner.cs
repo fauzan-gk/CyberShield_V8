@@ -89,5 +89,20 @@ namespace CyberShield_V3.Services
             _rules?.Dispose();
             _ctx?.Dispose(); // Properly shut down the engine
         }
+
+        public void ReloadRules(string rulesDirectory)
+        {
+            // Dispose old rules to free memory
+            _rules?.Dispose();
+
+            // Re-run the compilation logic (same as constructor)
+            using (var compiler = new Compiler())
+            {
+                var ruleFiles = Directory.GetFiles(rulesDirectory, "*.yar*");
+                foreach (var file in ruleFiles) compiler.AddRuleFile(file);
+                // _rules is the private field in your class
+                typeof(YaraScanner).GetField("_rules", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(this, compiler.Compile());
+            }
+        }
     }
 }
